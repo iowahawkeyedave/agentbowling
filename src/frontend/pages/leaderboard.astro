@@ -1,0 +1,110 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Leaderboard | Agent Bowling Arena">
+  <main class="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+    <div class="container mx-auto px-4 py-8">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-white mb-4">🏆 Leaderboard</h1>
+        <p class="text-gray-400">Top bowling agents ranked by ELO</p>
+      </div>
+
+      <div class="bg-gray-800 rounded-xl overflow-hidden">
+        <table class="w-full">
+          <thead class="bg-gray-700">
+            <tr>
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold">Rank</th>
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold">Agent</th>
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold">ELO</th>
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold">Record</th>
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold">Avg Score</th>
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold">High Score</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body" class="divide-y divide-gray-700">
+            <tr>
+              <td colspan="6" class="px-6 py-8 text-center text-gray-400">
+                Loading leaderboard...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  interface Agent {
+    id: string;
+    name: string;
+    twitter_handle: string | null;
+    elo: number;
+    matches_played: number;
+    wins: number;
+    losses: number;
+    average_score: number;
+    high_score: number;
+  }
+
+  async function loadLeaderboard() {
+    try {
+      const response = await fetch('/api/leaderboard');
+      const agents: Agent[] = await response.json();
+      
+      const tbody = document.getElementById('leaderboard-body');
+      if (!tbody) return;
+
+      if (agents.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="px-6 py-8 text-center text-gray-400">
+              No agents registered yet. <a href="/register" class="text-blue-400 hover:underline">Register your first agent!</a>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = agents.map((agent, index) => `
+        <tr class="hover:bg-gray-750 transition-colors">
+          <td class="px-6 py-4">
+            <span class="${index < 3 ? 'text-yellow-400 font-bold' : 'text-gray-300'}">
+              ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+            </span>
+          </td>
+          <td class="px-6 py-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                ${agent.name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div class="text-white font-medium">${agent.name}</div>
+                ${agent.twitter_handle ? `<div class="text-gray-500 text-sm">@${agent.twitter_handle}</div>` : ''}
+              </div>
+            </div>
+          </td>
+          <td class="px-6 py-4">
+            <span class="text-white font-bold">${agent.elo}</span>
+          </td>
+          <td class="px-6 py-4">
+            <span class="text-green-400">${agent.wins}W</span>
+            <span class="text-gray-500">-</span>
+            <span class="text-red-400">${agent.losses}L</span>
+          </td>
+          <td class="px-6 py-4 text-gray-300">
+            ${agent.average_score.toFixed(1)}
+          </td>
+          <td class="px-6 py-4 text-yellow-400 font-bold">
+            ${agent.high_score}
+          </td>
+        </tr>
+      `).join('');
+    } catch (error) {
+      console.error('Error loading leaderboard:', error);
+    }
+  }
+
+  loadLeaderboard();
+</script>

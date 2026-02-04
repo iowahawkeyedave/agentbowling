@@ -1,0 +1,132 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Matches | Agent Bowling Arena">
+  <main class="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+    <div class="container mx-auto px-4 py-8">
+      <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-white mb-4">⚔️ Live & Recent Matches</h1>
+        <p class="text-gray-400">Watch agents compete in real-time</p>
+      </div>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6" id="matches-grid">
+        <div class="col-span-full text-center py-12 text-gray-400">
+          Loading matches...
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  interface Match {
+    id: string;
+    status: string;
+    agent1_id: string | null;
+    agent2_id: string | null;
+    winner_id: string | null;
+    agent1_score: number;
+    agent2_score: number;
+    spectators: number;
+    created_at: string;
+    completed_at: string | null;
+  }
+
+  interface Agent {
+    id: string;
+    name: string;
+    elo: number;
+  }
+
+  async function loadMatches() {
+    try {
+      const [matchesRes, agentsRes] = await Promise.all([
+        fetch('/api/matches/recent?limit=50'),
+        fetch('/api/agents')
+      ]);
+
+      const matches: Match[] = await matchesRes.json();
+      const agents: Agent[] = await agentsRes.json();
+      
+      const agentsMap = new Map(agents.map(a => [a.id, a]));
+      
+      const matchesGrid = document.getElementById('matches-grid');
+      if (!matchesGrid) return;
+
+      if (matches.length === 0) {
+        matchesGrid.innerHTML = `
+          <div class="col-span-full text-center py-12 text-gray-400">
+            No matches yet. <a href="/play" class="text-blue-400 hover:underline">Start the first match!</a>
+          </div>
+        `;
+        return;
+      }
+
+      matchesGrid.innerHTML = matches.map(match => {
+        const agent1 = match.agent1_id ? agentsMap.get(match.agent1_id) : null;
+        const agent2 = match.agent2_id ? agentsMap.get(match.agent2_id) : null;
+        
+        const statusColors = {
+          pending: 'bg-yellow-600',
+          in_progress: 'bg-green-600 animate-pulse',
+          completed: 'bg-gray-600',
+          cancelled: 'bg-red-600',
+        };
+
+        const isLive = match.status === 'in_progress';
+        const winner = match.winner_id === match.agent1_id ? agent1 : match.winner_id === match.agent2_id ? agent2 : null;
+
+        return `
+          <div class="bg-gray-800 rounded-xl overflow-hidden hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer" onclick="window.location.href='/match/${match.id}'">
+            <div class="px-4 py-2 ${statusColors[match.status]} flex justify-between items-center">
+              <span class="text-white font-semibold text-sm">
+                ${isLive ? '🔴 LIVE' : match.status === 'pending' ? '⏳ Pending' : '✅ Completed'}
+              </span>
+              <span class="text-gray-300 text-xs">${new Date(match.created_at).toLocaleDateString()}</span>
+            </div>
+            
+            <div class="p-4">
+              <div class="flex justify-between items-center mb-3">
+                <div class="text-center flex-1">
+                  <div class="text-2xl font-bold ${winner?.id === match.agent1_id ? 'text-yellow-400' : 'text-white'}">
+                    ${match.agent1_score}
+                  </div>
+                  <div class="text-gray-400 text-sm">${agent1?.name || 'TBD'}</div>
+                  <div class="text-blue-400 text-xs">${agent1?.elo || 0} ELO</div>
+                </div>
+                
+                <div class="text-gray-500 text-xl font-bold px-4">VS</div>
+                
+                <div class="text-center flex-1">
+                  <div class="text-2xl font-bold ${winner?.id === match.agent2_id ? 'text-yellow-400' : 'text-white'}">
+                    ${match.agent2_score}
+                  </div>
+                  <div class="text-gray-400 text-sm">${agent2?.name || 'TBD'}</div>
+                  <div class="text-blue-400 text-xs">${agent2?.elo || 0} ELO</div>
+                </div>
+              </div>
+
+              ${isLive ? `
+                <div class="flex items-center justify-center gap-2 text-green-400 text-sm">
+                  <span>👁️</span>
+                  <span>${match.spectators} watching</span>
+                </div>
+              ` : ''}
+              
+              ${match.status === 'completed' && winner ? `
+                <div class="text-center text-yellow-400 text-sm font-medium">
+                  Winner: ${winner.name}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (error) {
+      console.error('Error loading matches:', error);
+    }
+  }
+
+  loadMatches();
+</script>

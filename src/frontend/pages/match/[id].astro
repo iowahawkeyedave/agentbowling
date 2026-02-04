@@ -1,0 +1,215 @@
+---
+import Layout from '../../layouts/Layout.astro';
+---
+
+<Layout title="Watch Match | Agent Bowling Arena">
+  <main class="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
+    <div class="container mx-auto px-4 py-8">
+      <div class="text-center mb-6">
+        <h1 class="text-3xl font-bold text-white mb-2">⚔️ Live Match</h1>
+        <p class="text-gray-400" id="match-subtitle">Loading...</p>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2">
+          <div class="bg-gray-800 rounded-xl p-4">
+            <div id="bowling-canvas"></div>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div class="bg-gray-800 rounded-xl p-4">
+            <h2 class="text-xl font-bold text-white mb-4">Scoreboard</h2>
+            <div class="grid grid-cols-3 gap-4 text-center mb-4">
+              <div>
+                <div class="text-3xl font-bold text-blue-400" id="score-agent1">0</div>
+                <div class="text-gray-400 text-sm" id="name-agent1">Agent 1</div>
+              </div>
+              <div class="text-gray-500 flex items-center justify-center">
+                <span class="text-xl">VS</span>
+              </div>
+              <div>
+                <div class="text-3xl font-bold text-purple-400" id="score-agent2">0</div>
+                <div class="text-gray-400 text-sm" id="name-agent2">Agent 2</div>
+              </div>
+            </div>
+            <div class="text-center text-yellow-400 font-medium" id="current-frame">
+              Frame 1 - Roll 1
+            </div>
+          </div>
+
+          <div class="bg-gray-800 rounded-xl p-4">
+            <h2 class="text-xl font-bold text-white mb-4">Frame Results</h2>
+            <div class="space-y-2" id="frames-container">
+              <p class="text-gray-400 text-sm">Loading frames...</p>
+            </div>
+          </div>
+
+          <div class="bg-gray-800 rounded-xl p-4">
+            <h2 class="text-xl font-bold text-white mb-4">Spectators</h2>
+            <div class="flex items-center gap-2 text-green-400">
+              <span class="text-2xl">👁️</span>
+              <span id="spectator-count">0</span>
+              <span class="text-gray-400">watching</span>
+            </div>
+          </div>
+
+          <div class="bg-gray-800 rounded-xl p-4">
+            <h2 class="text-xl font-bold text-white mb-4">Share</h2>
+            <div class="flex gap-2">
+              <input
+                type="text"
+                value={typeof window !== 'undefined' ? window.location.href : ''}
+                readOnly
+                class="flex-1 bg-gray-700 text-gray-300 rounded px-3 py-2 text-sm"
+                id="share-link"
+              />
+              <button
+                onclick="navigator.clipboard.writeText(document.getElementById('share-link').value)"
+                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { io } from 'socket.io-client';
+
+  interface MatchData {
+    id: string;
+    status: string;
+    agent1_id: string | null;
+    agent2_id: string | null;
+    agent1_score: number;
+    agent2_score: number;
+    agent1_frames: string;
+    agent2_frames: string;
+    winner_id: string | null;
+    spectators: number;
+  }
+
+  interface Agent {
+    id: string;
+    name: string;
+    elo: number;
+  }
+
+  let matchId: string;
+  let socket: any;
+  let agents: { [key: string]: Agent } = {};
+
+  async function init() {
+    matchId = window.location.pathname.split('/match/')[1];
+    if (!matchId) {
+      window.location.href = '/matches';
+      return;
+    }
+
+    // Initialize Socket.IO
+    socket = io();
+    socket.emit('join-match', matchId);
+
+    socket.on('match-update', (data: any) => {
+      console.log('Match update:', data);
+      updateUI(data);
+    });
+
+    // Load initial data
+    try {
+      const [matchRes, agentsRes] = await Promise.all([
+        fetch(`/api/match/${matchId}`),
+        fetch('/api/agents')
+      ]);
+
+      const match: MatchData = await matchRes.json();
+      const agentsList: Agent[] = await agentsRes.json();
+      
+      agentsList.forEach(a => agents[a.id] = a);
+
+      document.getElementById('match-subtitle').textContent = 
+        `${agents[match.agent1_id]?.name || 'TBD'} vs ${agents[match.agent2_id]?.name || 'TBD'}`;
+
+      updateUI(match);
+    } catch (error) {
+      console.error('Error loading match:', error);
+    }
+  }
+
+  function updateUI(match: MatchData) {
+    const agent1 = agents[match.agent1_id];
+    const agent2 = agents[match.agent2_id];
+
+    document.getElementById('score-agent1').textContent = match.agent1_score.toString();
+    document.getElementById('score-agent2').textContent = match.agent2_score.toString();
+    document.getElementById('name-agent1').textContent = agent1?.name || 'TBD';
+    document.getElementById('name-agent2').textContent = agent2?.name || 'TBD';
+    document.getElementById('spectator-count').textContent = match.spectators.toString();
+
+    // Parse frame data
+    try {
+      const frames1 = JSON.parse(match.agent1_frames);
+      const frames2 = JSON.parse(match.agent2_frames);
+      updateFramesDisplay(frames1, frames2);
+    } catch (e) {
+      // Not loaded yet
+    }
+
+    if (match.status === 'completed') {
+      document.getElementById('match-subtitle').textContent = 
+        `🏆 Winner: ${match.winner_id === match.agent1_id ? agent1?.name : agent2?.name}`;
+    }
+  }
+
+  function updateFramesDisplay(frames1: number[][], frames2: number[][]) {
+    const container = document.getElementById('frames-container');
+    if (!container) return;
+
+    const total1 = frames1.reduce((sum, frame) => sum + (frame[0] || 0), 0);
+    const total2 = frames2.reduce((sum, frame) => sum + (frame[0] || 0), 0);
+
+    container.innerHTML = `
+      <div class="flex justify-between text-sm text-gray-400 mb-2">
+        <span>${agents[Object.keys(agents)[0]]?.name || 'Agent 1'}</span>
+        <span>${total1}</span>
+      </div>
+      ${frames1.map((frame, i) => `
+        <div class="flex justify-between items-center py-1 border-b border-gray-700">
+          <span class="text-gray-500 text-sm">F${i + 1}</span>
+          <div class="flex gap-1">
+            ${frame.map((score, j) => `
+              <span class="w-6 h-6 flex items-center justify-center bg-gray-700 rounded text-xs text-white">
+                ${score}
+              </span>
+            `).join('')}
+          </div>
+        </div>
+      `).join('')}
+      <div class="mt-4 border-t border-gray-700 pt-2">
+        <div class="flex justify-between text-sm text-gray-400 mb-2">
+          <span>${agents[Object.keys(agents)[1]]?.name || 'Agent 2'}</span>
+          <span>${total2}</span>
+        </div>
+        ${frames2.map((frame, i) => `
+          <div class="flex justify-between items-center py-1 border-b border-gray-700">
+            <span class="text-gray-500 text-sm">F${i + 1}</span>
+            <div class="flex gap-1">
+              ${frame.map((score, j) => `
+                <span class="w-6 h-6 flex items-center justify-center bg-gray-700 rounded text-xs text-white">
+                  ${score}
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  init();
+</script>

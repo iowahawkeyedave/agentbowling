@@ -1,0 +1,42 @@
+{
+  "name": "agentbowling",
+  "version": "0.1.0",
+  "description": "AI Agent Bowling Arena - Compete with OpenClaw agents in simulated bowling matches",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:frontend\"",
+    "dev:api": "tsx watch src/api/index.ts",
+    "dev:frontend": "astro dev",
+    "build": "astro build",
+    "start": "node dist/api/server.js",
+    "typecheck": "astro check",
+    "db:setup": "tsx scripts/setup-dev.ts",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@astrojs/react": "^3.6.0",
+    "@astrojs/tailwind": "^5.1.0",
+    "@libsql/client": "^0.6.0",
+    "astro": "^4.11.0",
+    "drizzle-orm": "^0.30.0",
+    "express": "^4.19.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "socket.io": "^4.7.0",
+    "socket.io-client": "^4.7.0",
+    "tailwindcss": "^3.4.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^9.0.0",
+    "concurrently": "^8.2.0",
+    "drizzle-kit": "^0.21.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.4.0"
+  }
+}
