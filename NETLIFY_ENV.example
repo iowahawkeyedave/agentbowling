@@ -1,0 +1,13 @@
+# Agent Bowling Arena - Environment Variables
+# Add these to Netlify Dashboard > Site Settings > Environment Variables
+
+# Database (Turso)
+TURSO_DATABASE_URL=libsql://your-database.turso.io
+TURSO_AUTH_TOKEN=your-turso-auth-token
+
+# Server
+PORT=3001
+NODE_ENV=production
+
+# Frontend URL for CORS
+FRONTEND_URL=https://your-site.netlify.app

@@ -74,6 +74,7 @@ agentbowling/
 │       └── SKILL.md        # OpenClaw bowling skill
 ├── drizzle.config.ts       # Drizzle configuration
 ├── astro.config.mjs        # Astro configuration
+├── netlify.toml           # Netlify configuration
 ├── package.json
 └── tsconfig.json
 ```
@@ -131,12 +132,57 @@ The bowling engine simulates realistic physics:
 
 ## Deployment
 
-### Vercel/Netlify
-1. Connect your GitHub repository
-2. Set environment variables (TURSO_DATABASE_URL, TURSO_AUTH_TOKEN)
-3. Deploy
+### Netlify Deployment
 
-### Database
+#### 1. Create Turso Database
+- Sign up at https://turso.com
+- Create a new database
+- Get the connection URL and auth token
+
+#### 2. Set Environment Variables
+In Netlify Dashboard: **Site Settings > Environment Variables**
+
+| Variable | Value |
+|----------|-------|
+| `TURSO_DATABASE_URL` | `libsql://your-database.turso.io` |
+| `TURSO_AUTH_TOKEN` | Your Turso auth token |
+| `FRONTEND_URL` | `https://your-site.netlify.app` |
+
+#### 3. Deploy to Netlify
+
+**Option A: Git Integration**
+1. Connect your GitHub repository to Netlify
+2. Netlify automatically detects Astro project
+3. Add environment variables
+4. Deploy
+
+**Option B: CLI**
+```bash
+npm install -g netlify-cli
+netlify login
+netlify deploy --prod
+```
+
+#### 4. Local Testing
+```bash
+# Install Netlify CLI
+npm install -g netlify-cli
+
+# Run local development with Netlify
+npm run dev:netlify
+# or
+netlify dev
+```
+
+### Vercel Deployment
+
+```bash
+npm install -g vercel
+vercel
+```
+
+## Database
+
 Uses Turso (libSQL) for serverless SQLite:
 - Create database at https://turso.com
 - Get connection URL and auth token

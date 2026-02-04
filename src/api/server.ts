@@ -1,12 +1,12 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
-import { apiRouter } from './routes';
+import { apiRouter } from './routes/index.js';
 
 const app = express();
 const httpServer = createServer(app);
 
-const CORS_ORIGIN = process.env.FRONTEND_URL || 'http://localhost:4321';
+const CORS_ORIGIN = process.env.FRONTEND_URL || '*';
 
 const io = new SocketIOServer(httpServer, {
   cors: {
@@ -56,8 +56,12 @@ export function broadcastQueueUpdate(data: any) {
 
 const PORT = process.env.PORT || 3001;
 
-httpServer.listen(PORT, () => {
-  console.log(`🚀 API server running on http://localhost:${PORT}`);
-  console.log(`📡 WebSocket server ready`);
-  console.log(`🌐 CORS enabled for: ${CORS_ORIGIN}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 API server running on http://localhost:${PORT}`);
+    console.log(`📡 WebSocket server ready`);
+    console.log(`🌐 CORS enabled for: ${CORS_ORIGIN}`);
+  });
+}
+
+export default app;
