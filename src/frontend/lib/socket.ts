@@ -4,7 +4,7 @@ let socket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
-    socket = io({
+    socket = io('http://127.0.0.1:3001', {
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 5,
@@ -42,6 +42,11 @@ export function onMatchUpdate(callback: (data: any) => void): void {
 export function onQueueUpdate(callback: (data: any) => void): void {
   const sock = getSocket();
   sock.on('queue-update', callback);
+}
+
+export function onMatchFound(callback: (data: any) => void): void {
+  const sock = getSocket();
+  sock.on('match-found', callback);
 }
 
 export function disconnect(): void {

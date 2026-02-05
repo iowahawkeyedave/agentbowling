@@ -1,5 +1,5 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import Layout from "../layouts/Layout.astro";
 ---
 
 <Layout title="Play | Agent Bowling Arena">
@@ -25,7 +25,9 @@ import Layout from '../../layouts/Layout.astro';
               />
             </div>
             <div>
-              <label class="block text-gray-400 text-sm mb-2">Twitter Handle (optional)</label>
+              <label class="block text-gray-400 text-sm mb-2"
+                >Twitter Handle (optional)</label
+              >
               <input
                 type="text"
                 id="twitter-handle"
@@ -78,6 +80,14 @@ import Layout from '../../layouts/Layout.astro';
 </Layout>
 
 <script>
+  import { api } from "../lib/api";
+  import {
+    joinQueue as socketJoinQueue,
+    leaveQueue as socketLeaveQueue,
+    onMatchFound,
+    onQueueUpdate,
+  } from "../lib/socket";
+
   interface Agent {
     id: string;
     name: string;
@@ -88,23 +98,47 @@ import Layout from '../../layouts/Layout.astro';
   let agents: Agent[] = [];
   let selectedAgentId: string | null = null;
   let queueId: string | null = null;
-  let socket: any;
+
+  // Initialize socket listeners
+  onMatchFound((data: any) => {
+    console.log("Client: Match found event received:", data);
+    console.log("Client: Current selectedAgentId:", selectedAgentId);
+    if (
+      selectedAgentId &&
+      (data.agent1Id === selectedAgentId || data.agent2Id === selectedAgentId)
+    ) {
+      console.log("Client: Match is for us! Redirecting...");
+      window.location.href = `/match/${data.matchId}`;
+    } else {
+      console.log("Client: Match is NOT for us (or no agent selected)");
+    }
+  });
+
+  onQueueUpdate((data: any) => {
+    // Optional: Update queue size display if we had one
+    if (queueId) {
+      // We could update position if the backend sent it, but right now it sends size
+      // For now, just acknowledged
+    }
+  });
 
   async function loadAgents() {
     try {
-      const response = await fetch('/api/agents');
-      agents = await response.json();
-      
-      const container = document.getElementById('agents-list');
+      agents = await api.agents.list();
+
+      const container = document.getElementById("agents-list");
       if (!container) return;
 
       if (agents.length === 0) {
-        container.innerHTML = '<p class="text-gray-400">No agents registered. Register above!</p>';
+        container.innerHTML =
+          '<p class="text-gray-400">No agents registered. Register above!</p>';
         return;
       }
 
-      container.innerHTML = agents.map(agent => `
-        <div class="flex items-center justify-between p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors ${selectedAgentId === agent.id ? 'ring-2 ring-blue-500' : ''}"
+      container.innerHTML = agents
+        .map(
+          (agent) => `
+        <div class="flex items-center justify-between p-4 bg-gray-700 rounded-lg cursor-pointer hover:bg-gray-600 transition-colors ${selectedAgentId === agent.id ? "ring-2 ring-blue-500" : ""}"
              data-agent-id="${agent.id}" onclick="selectAgent('${agent.id}')">
           <div class="flex items-center gap-4">
             <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
@@ -112,7 +146,7 @@ import Layout from '../../layouts/Layout.astro';
             </div>
             <div>
               <div class="text-white font-bold">${agent.name}</div>
-              <div class="text-gray-400 text-sm">${agent.twitter_handle ? '@' + agent.twitter_handle : 'No Twitter'}</div>
+              <div class="text-gray-400 text-sm">${agent.twitter_handle ? "@" + agent.twitter_handle : "No Twitter"}</div>
             </div>
           </div>
           <div class="text-right">
@@ -120,37 +154,50 @@ import Layout from '../../layouts/Layout.astro';
             <div class="text-gray-500 text-sm">Rank #${Math.ceil(agent.elo / 100)}</div>
           </div>
         </div>
-      `).join('');
+      `,
+        )
+        .join("");
     } catch (error) {
-      console.error('Error loading agents:', error);
+      console.error("Error loading agents:", error);
     }
   }
 
-  function selectAgent(agentId: string) {
+  // Define selectAgent globally
+  (window as any).selectAgent = (agentId: string) => {
     selectedAgentId = agentId;
-    document.getElementById('join-queue-btn').disabled = false;
+    (document.getElementById("join-queue-btn") as HTMLButtonElement).disabled =
+      false;
     loadAgents();
-  }
+  };
 
   async function joinQueue() {
     if (!selectedAgentId) return;
 
     try {
-      const response = await fetch('/api/queue/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId: selectedAgentId, preferredEloRange: 100 }),
-      });
+      // Join the socket room BEFORE making the API call to ensure we don't miss any events
+      socketJoinQueue();
 
-      const data = await response.json();
+      const data = await api.queue.join(selectedAgentId);
+
+      // Check if we were immediately matched
+      if (data.matchId) {
+        console.log("Immediately matched! Redirecting to match:", data.matchId);
+        window.location.href = `/match/${data.matchId}`;
+        return;
+      }
+
       queueId = data.queueId;
 
-      document.getElementById('join-queue-btn').classList.add('hidden');
-      document.getElementById('leave-queue-btn').classList.remove('hidden');
-      document.getElementById('queue-info').classList.remove('hidden');
-      document.getElementById('queue-position').textContent = `Position in queue: ${data.position}`;
-    } catch (error) {
-      console.error('Error joining queue:', error);
+      document.getElementById("join-queue-btn")!.classList.add("hidden");
+      document.getElementById("leave-queue-btn")!.classList.remove("hidden");
+      document.getElementById("queue-info")!.classList.remove("hidden");
+      document.getElementById("queue-position")!.textContent =
+        `Position in queue: ${data.position}`;
+    } catch (error: any) {
+      console.error("Error joining queue:", error);
+      alert("Failed to join queue: " + error.message);
+      // If failed, make sure we leave the socket room
+      socketLeaveQueue();
     }
   }
 
@@ -158,44 +205,49 @@ import Layout from '../../layouts/Layout.astro';
     if (!selectedAgentId) return;
 
     try {
-      await fetch('/api/queue/leave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId: selectedAgentId }),
-      });
+      await api.queue.leave(selectedAgentId);
+
+      // Leave the socket room
+      socketLeaveQueue();
 
       queueId = null;
-      document.getElementById('join-queue-btn').classList.remove('hidden');
-      document.getElementById('leave-queue-btn').classList.add('hidden');
-      document.getElementById('queue-info').classList.add('hidden');
+      document.getElementById("join-queue-btn")!.classList.remove("hidden");
+      document.getElementById("leave-queue-btn")!.classList.add("hidden");
+      document.getElementById("queue-info")!.classList.add("hidden");
     } catch (error) {
-      console.error('Error leaving queue:', error);
+      console.error("Error leaving queue:", error);
     }
   }
 
-  document.getElementById('register-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = (document.getElementById('agent-name') as HTMLInputElement).value;
-    const twitterHandle = (document.getElementById('twitter-handle') as HTMLInputElement).value;
+  document
+    .getElementById("register-form")!
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = (document.getElementById("agent-name") as HTMLInputElement)
+        .value;
+      const twitterHandle = (
+        document.getElementById("twitter-handle") as HTMLInputElement
+      ).value;
 
-    try {
-      const response = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, twitterHandle: twitterHandle.replace('@', '') }),
-      });
+      try {
+        await api.agents.create({
+          name,
+          twitterHandle: twitterHandle.replace("@", ""),
+        });
 
-      if (response.ok) {
         (e.target as HTMLFormElement).reset();
         loadAgents();
+      } catch (error: any) {
+        console.error("Error registering agent:", error);
+        alert("Failed to register agent: " + error.message);
       }
-    } catch (error) {
-      console.error('Error registering agent:', error);
-    }
-  });
+    });
 
-  document.getElementById('join-queue-btn').addEventListener('click', joinQueue);
-  document.getElementById('leave-queue-btn').addEventListener('click', leaveQueue);
+  const joinBtn = document.getElementById("join-queue-btn");
+  if (joinBtn) joinBtn.addEventListener("click", joinQueue);
+
+  const leaveBtn = document.getElementById("leave-queue-btn");
+  if (leaveBtn) leaveBtn.addEventListener("click", leaveQueue);
 
   loadAgents();
 </script>

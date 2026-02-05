@@ -16,14 +16,37 @@ export interface MatchmakingResult {
   agent2Id: string;
 }
 
+
 export class MatchmakingService {
   private queue: Map<string, { agentId: string; elo: number; createdAt: Date; preferredRange: number }>;
+  private listeners: { [key: string]: Function[] } = {};
 
   constructor() {
+    console.log('MatchmakingService instance created');
     this.queue = new Map();
   }
 
-  async addToQueue(agentId: string, preferredEloRange: number = 100): Promise<{ queueId: string; position: number }> {
+  on(event: 'match-found' | 'queue-update', callback: Function) {
+    if (!this.listeners[event]) {
+      this.listeners[event] = [];
+    }
+    this.listeners[event].push(callback);
+  }
+
+  private emit(event: 'match-found' | 'queue-update', data: any) {
+    if (this.listeners[event]) {
+      this.listeners[event].forEach(cb => cb(data));
+    }
+  }
+
+  async addToQueue(agentId: string, preferredEloRange: number = 100): Promise<{ queueId: string; position: number; matchId?: string }> {
+    // Check if agent is already in queue
+    for (const [existingQueueId, entry] of this.queue.entries()) {
+      if (entry.agentId === agentId) {
+        return { queueId: existingQueueId, position: this.getQueuePosition(existingQueueId) };
+      }
+    }
+
     const agents = await query('SELECT * FROM agents WHERE id = ?', [agentId]);
     const agent = agents[0];
 
@@ -39,6 +62,16 @@ export class MatchmakingService {
       preferredRange: preferredEloRange,
     });
 
+    // Try to find a match immediately
+    const match = await this.findMatch(agentId);
+
+    if (match) {
+      this.emit('match-found', match);
+      this.emit('queue-update', { queueSize: this.getQueueSize() });
+      return { queueId, position: 0, matchId: match.matchId }; // 0 implies matched
+    }
+
+    this.emit('queue-update', { queueSize: this.getQueueSize() });
     const position = this.getQueuePosition(queueId);
     return { queueId, position };
   }
@@ -47,6 +80,7 @@ export class MatchmakingService {
     for (const [queueId, entry] of this.queue.entries()) {
       if (entry.agentId === agentId) {
         this.queue.delete(queueId);
+        this.emit('queue-update', { queueSize: this.getQueueSize() });
         break;
       }
     }
@@ -68,7 +102,7 @@ export class MatchmakingService {
 
       const matchId = uuidv4();
       const now = Date.now();
-      
+
       await client.execute({
         sql: `INSERT INTO matches (id, status, agent1_id, agent2_id, agent1_score, agent2_score, agent1_frames, agent2_frames, replay_data, spectators, created_at)
               VALUES (?, 'pending', ?, ?, 0, 0, '[]', '[]', '[]', 0, ?)`,
@@ -93,7 +127,7 @@ export class MatchmakingService {
       if (entry.agentId === agentEntry.agentId) continue;
 
       const eloDiff = Math.abs(entry.elo - agentEntry.elo);
-      
+
       if (eloDiff <= agentEntry.preferredRange) {
         const timeScore = (entry.createdAt.getTime() - agentEntry.createdAt.getTime()) / 1000;
         const totalScore = eloDiff + Math.abs(timeScore) * 0.1;
@@ -109,7 +143,7 @@ export class MatchmakingService {
   }
 
   getQueuePosition(queueId: string): number {
-    const entries = Array.from(this.queue.entries()).sort((a, b) => 
+    const entries = Array.from(this.queue.entries()).sort((a, b) =>
       a[1].createdAt.getTime() - b[1].createdAt.getTime()
     );
     return entries.findIndex(([id]) => id === queueId) + 1;

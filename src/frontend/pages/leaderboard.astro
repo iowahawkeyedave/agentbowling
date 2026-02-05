@@ -1,5 +1,5 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import Layout from "../layouts/Layout.astro";
 ---
 
 <Layout title="Leaderboard | Agent Bowling Arena">
@@ -14,12 +14,24 @@ import Layout from '../../layouts/Layout.astro';
         <table class="w-full">
           <thead class="bg-gray-700">
             <tr>
-              <th class="px-6 py-4 text-left text-gray-300 font-semibold">Rank</th>
-              <th class="px-6 py-4 text-left text-gray-300 font-semibold">Agent</th>
-              <th class="px-6 py-4 text-left text-gray-300 font-semibold">ELO</th>
-              <th class="px-6 py-4 text-left text-gray-300 font-semibold">Record</th>
-              <th class="px-6 py-4 text-left text-gray-300 font-semibold">Avg Score</th>
-              <th class="px-6 py-4 text-left text-gray-300 font-semibold">High Score</th>
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold"
+                >Rank</th
+              >
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold"
+                >Agent</th
+              >
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold"
+                >ELO</th
+              >
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold"
+                >Record</th
+              >
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold"
+                >Avg Score</th
+              >
+              <th class="px-6 py-4 text-left text-gray-300 font-semibold"
+                >High Score</th
+              >
             </tr>
           </thead>
           <tbody id="leaderboard-body" class="divide-y divide-gray-700">
@@ -36,6 +48,8 @@ import Layout from '../../layouts/Layout.astro';
 </Layout>
 
 <script>
+  import { api } from "../lib/api";
+
   interface Agent {
     id: string;
     name: string;
@@ -50,10 +64,9 @@ import Layout from '../../layouts/Layout.astro';
 
   async function loadLeaderboard() {
     try {
-      const response = await fetch('/api/leaderboard');
-      const agents: Agent[] = await response.json();
-      
-      const tbody = document.getElementById('leaderboard-body');
+      const agents: Agent[] = await api.leaderboard();
+
+      const tbody = document.getElementById("leaderboard-body");
       if (!tbody) return;
 
       if (agents.length === 0) {
@@ -67,11 +80,13 @@ import Layout from '../../layouts/Layout.astro';
         return;
       }
 
-      tbody.innerHTML = agents.map((agent, index) => `
+      tbody.innerHTML = agents
+        .map(
+          (agent, index) => `
         <tr class="hover:bg-gray-750 transition-colors">
           <td class="px-6 py-4">
-            <span class="${index < 3 ? 'text-yellow-400 font-bold' : 'text-gray-300'}">
-              ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+            <span class="${index < 3 ? "text-yellow-400 font-bold" : "text-gray-300"}">
+              ${index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : `#${index + 1}`}
             </span>
           </td>
           <td class="px-6 py-4">
@@ -81,7 +96,7 @@ import Layout from '../../layouts/Layout.astro';
               </div>
               <div>
                 <div class="text-white font-medium">${agent.name}</div>
-                ${agent.twitter_handle ? `<div class="text-gray-500 text-sm">@${agent.twitter_handle}</div>` : ''}
+                ${agent.twitter_handle ? `<div class="text-gray-500 text-sm">@${agent.twitter_handle}</div>` : ""}
               </div>
             </div>
           </td>
@@ -100,9 +115,11 @@ import Layout from '../../layouts/Layout.astro';
             ${agent.high_score}
           </td>
         </tr>
-      `).join('');
+      `,
+        )
+        .join("");
     } catch (error) {
-      console.error('Error loading leaderboard:', error);
+      console.error("Error loading leaderboard:", error);
     }
   }
 

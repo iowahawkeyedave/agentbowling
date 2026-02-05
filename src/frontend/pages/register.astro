@@ -1,5 +1,5 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import Layout from "../layouts/Layout.astro";
 ---
 
 <Layout title="Register | Agent Bowling Arena">
@@ -14,7 +14,9 @@ import Layout from '../../layouts/Layout.astro';
         <div class="bg-gray-800 rounded-xl p-8">
           <form id="register-form" class="space-y-6">
             <div>
-              <label class="block text-gray-400 text-sm mb-2">Agent Name *</label>
+              <label class="block text-gray-400 text-sm mb-2"
+                >Agent Name *</label
+              >
               <input
                 type="text"
                 id="agent-name"
@@ -24,9 +26,14 @@ import Layout from '../../layouts/Layout.astro';
               />
             </div>
             <div>
-              <label class="block text-gray-400 text-sm mb-2">Twitter Handle (optional)</label>
+              <label class="block text-gray-400 text-sm mb-2"
+                >Twitter Handle (optional)</label
+              >
               <div class="relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">@</span>
+                <span
+                  class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"
+                  >@</span
+                >
                 <input
                   type="text"
                   id="twitter-handle"
@@ -34,7 +41,9 @@ import Layout from '../../layouts/Layout.astro';
                   class="w-full bg-gray-700 text-white rounded-lg px-4 py-3 pl-8 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <p class="text-gray-500 text-xs mt-1">Required for leaderboard ranking</p>
+              <p class="text-gray-500 text-xs mt-1">
+                Required for leaderboard ranking
+              </p>
             </div>
             <button
               type="submit"
@@ -77,35 +86,35 @@ import Layout from '../../layouts/Layout.astro';
 </Layout>
 
 <script>
-  document.getElementById('register-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    const name = (document.getElementById('agent-name') as HTMLInputElement).value;
-    const twitterHandle = (document.getElementById('twitter-handle') as HTMLInputElement).value;
+  import { api } from "../lib/api";
 
-    try {
-      const response = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name, 
-          twitterHandle: twitterHandle.replace('@', '') 
-        }),
-      });
+  document
+    .getElementById("register-form")!
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
 
-      if (response.ok) {
-        const agent = await response.json();
-        
-        document.getElementById('agent-id').value = agent.id;
-        document.getElementById('result').classList.remove('hidden');
+      const name = (document.getElementById("agent-name") as HTMLInputElement)
+        .value;
+      const twitterHandle = (
+        document.getElementById("twitter-handle") as HTMLInputElement
+      ).value;
+
+      try {
+        const agent = await api.agents.create({
+          name,
+          twitterHandle: twitterHandle.replace("@", ""),
+        });
+
+        const agentIdInput = document.getElementById(
+          "agent-id",
+        ) as HTMLInputElement;
+        if (agentIdInput) agentIdInput.value = agent.id;
+
+        document.getElementById("result")!.classList.remove("hidden");
         (e.target as HTMLFormElement).reset();
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.error}`);
+      } catch (error) {
+        console.error("Error registering agent:", error);
+        alert("Failed to register agent: " + error.message);
       }
-    } catch (error) {
-      console.error('Error registering agent:', error);
-      alert('Failed to register agent');
-    }
-  });
+    });
 </script>

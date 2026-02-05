@@ -1,6 +1,7 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import cors from 'cors';
 import { apiRouter } from './routes/index.js';
 
 const app = express();
@@ -15,8 +16,22 @@ const io = new SocketIOServer(httpServer, {
   },
 });
 
+import { matchmakingService } from './services/matchmaking.js';
+
+app.use(cors({ origin: CORS_ORIGIN }));
 app.use(express.json());
 app.use('/api', apiRouter);
+
+// Register matchmaking events
+matchmakingService.on('match-found', (data: any) => {
+  console.log('Server: Match found event received from service. MatchID:', data.matchId);
+  console.log('Server: Broadcasting to queue-room');
+  io.to('queue-room').emit('match-found', data);
+});
+
+matchmakingService.on('queue-update', (data: any) => {
+  io.to('queue-room').emit('queue-update', data);
+});
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
